@@ -3,3 +3,4 @@ work
 .nextflow*
 dev-config.json
 *.egg-info
+*.pyc
