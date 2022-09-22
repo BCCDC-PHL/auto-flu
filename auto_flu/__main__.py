@@ -15,6 +15,7 @@ DEFAULT_SCAN_INTERVAL_SECONDS = 3600.0
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config')
+    parser.add_argument('--log-level')
     args = parser.parse_args()
 
     config = {}

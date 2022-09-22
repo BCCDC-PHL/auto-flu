@@ -33,12 +33,12 @@ def find_fastq_dirs(config, check_symlinks_complete=True):
         conditions_met = list(conditions_checked.values())
         pipeline_parameters = {}
         if all(conditions_met):
-            logging.info(json.dumps({"event_type": "fastq_directory_found", "sequencing_run_id": run_id}))
+            logging.info(json.dumps({"event_type": "fastq_directory_found", "sequencing_run_id": run_id, "fastq_directory_path": os.path.abspath(subdir.path)}))
             pipeline_parameters['fastq_input'] = os.path.abspath(subdir.path)
             pipeline_parameters['outdir'] = analysis_outdir
             yield pipeline_parameters
         else:
-            logging.debug(json.dumps({"event_type": "directory_skipped", "conditions_checked": conditions_checked}))
+            logging.debug(json.dumps({"event_type": "directory_skipped", "fastq_directory_path": os.path.abspath(subdir.path), "conditions_checked": conditions_checked}))
             yield None
     
 
