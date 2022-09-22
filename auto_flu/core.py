@@ -1,7 +1,9 @@
+import datetime
 import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import uuid
 
@@ -70,9 +72,9 @@ def analyze_run(config, run):
         notification_email_addresses = []
     for pipeline in config['pipelines']:
         pipeline_parameters = pipeline['pipeline_parameters']
-        analysis_uuid = str(uuid.uuid4())
+        analysis_timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
         analysis_run_id = os.path.basename(run['fastq_input'])
-        analysis_work_dir = os.path.abspath(os.path.join(base_analysis_work_dir, 'work-' + analysis_uuid))
+        analysis_work_dir = os.path.abspath(os.path.join(base_analysis_work_dir, 'work-' + analysis_run_id + '-' + analysis_timestamp))
         analysis_report_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id, analysis_run_id + '_report.html'))
         analysis_trace_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id, analysis_run_id + '_trace.txt'))
         analysis_timeline_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id, analysis_run_id + '_timeline.html'))
@@ -100,11 +102,9 @@ def analyze_run(config, run):
         try:
             subprocess.run(pipeline_command, capture_output=True, check=True)
             logging.info(json.dumps({"event_type": "analysis_completed", "sequencing_run_id": analysis_run_id, "pipeline_command": " ".join(pipeline_command)}))
-            os.rmdir(analysis_work_dir)
+            shutil.rmtree(analysis_work_dir, ignore_errors=True)
             logging.info(json.dumps({"event_type": "analysis_work_dir_deleted", "sequencing_run_id": analysis_run_id, "analysis_work_dir_path": analysis_work_dir}))
         except subprocess.CalledProcessError as e:
             logging.error(json.dumps({"event_type": "analysis_failed", "sequencing_run_id": analysis_run_id, "pipeline_command": " ".join(pipeline_command)}))
         except OSError as e:
             logging.error(json.dumps({"event_type": "delete_analysis_work_dir_failed", "sequencing_run_id": analysis_run_id, "analysis_work_dir_path": analysis_work_dir}))
-        
-        
