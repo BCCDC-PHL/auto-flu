@@ -28,7 +28,7 @@ This tool takes a single config file, in JSON format, with the following structu
   "analysis_work_dir": "/path/to/auto-flu-work",
   "notification_email_addresses": [
 	"someone@example.org",
-	"someone_else@example.org
+	"someone_else@example.org"
   ],
   "send_notification_emails": true,
   "scan_interval_seconds": 3600,
