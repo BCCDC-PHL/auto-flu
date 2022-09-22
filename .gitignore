@@ -1,0 +1,5 @@
+test_*
+work
+.nextflow*
+dev-config.json
+*.egg-info
