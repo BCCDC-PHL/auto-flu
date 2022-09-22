@@ -38,17 +38,21 @@ def main():
     while(True):
         try:
             if args.config:
-                logging.info(json.dumps({"event_type": "load_config_start", "config_file": os.path.abspath(args.config)}))
                 try:
                     config = auto_flu.config.load_config(args.config)
-                    # Uncomment below to see the config on stdout each time it's reloaded
-                    # print(json.dumps(auto_fastq_symlink.config.make_config_json_serializable(config), indent=2))
+                    logging.info(json.dumps({"event_type": "config_loaded", "config_file": os.path.abspath(args.config)}))
                 except json.decoder.JSONDecodeError as e:
                     # If we fail to load the config file, we continue on with the
                     # last valid config that was loaded.
                     logging.error(json.dumps({"event_type": "load_config_failed", "config_file": os.path.abspath(args.config)}))
+
             scan_start_timestamp = datetime.datetime.now()
             for run in core.scan(config):
+                try:
+                    config = auto_flu.config.load_config(args.config)
+                    logging.info(json.dumps({"event_type": "config_loaded", "config_file": os.path.abspath(args.config)}))
+                except json.decoder.JSONDecodeError as e:
+                    logging.error(json.dumps({"event_type": "load_config_failed", "config_file": os.path.abspath(args.config)}))
                 if run is not None:
                     core.analyze_run(config, run)
                 if quit_when_safe:
