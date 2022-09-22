@@ -64,15 +64,18 @@ def analyze_run(config, run):
     """
     base_analysis_outdir = config['analysis_output_dir']
     base_analysis_work_dir = config['analysis_work_dir']
-    notification_email = config['notification_email']
+    if 'notification_email_addresses' in config:
+        notification_email_addresses = config['notification_email_addresses']
+    else:
+        notification_email_addresses = []
     for pipeline in config['pipelines']:
         pipeline_parameters = pipeline['pipeline_parameters']
         analysis_uuid = str(uuid.uuid4())
         analysis_run_id = os.path.basename(run['fastq_input'])
         analysis_work_dir = os.path.abspath(os.path.join(base_analysis_work_dir, 'work-' + analysis_uuid))
-        analysis_report_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id, analysis_run_id + '_' + analysis_uuid + '_report.html'))
-        analysis_trace_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id, analysis_run_id + '_' + analysis_uuid + '_trace.txt'))
-        analysis_timeline_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id, analysis_run_id + '_' + analysis_uuid + '_timeline.html'))
+        analysis_report_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id, analysis_run_id + '_report.html'))
+        analysis_trace_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id, analysis_run_id + '_trace.txt'))
+        analysis_timeline_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id, analysis_run_id + '_timeline.html'))
         pipeline_command = [
             'nextflow',
             'run',
@@ -84,14 +87,24 @@ def analyze_run(config, run):
             '-with-report', analysis_report_path,
             '-with-trace', analysis_trace_path,
             '-with-timeline', analysis_timeline_path,
-            '-with-notification', notification_email,
         ]
+        if 'send_notification_emails' in config and config['send_notification_emails']:
+            pipeline_command += ['-with-notification', ','.join(notification_email_addresses)]
         for flag, config_value in pipeline_parameters.items():
             if config_value is None:
                 value = run[flag]
             else:
                 value = config_value
             pipeline_command += ['--' + flag, value]
-        logging.info(json.dumps({"event_type": "analysis_started", "pipeline_command": pipeline_command}))
-        tmp_pipeline_command = ['nextflow', 'run', 'hello', '-work-dir', analysis_work_dir, '-with-notification', notification_email]
-        subprocess.run(pipeline_command)
+        logging.info(json.dumps({"event_type": "analysis_started", "sequencing_run_id": analysis_run_id, "pipeline_command": " ".join(pipeline_command)}))
+        try:
+            subprocess.run(pipeline_command, capture_output=True, check=True)
+            logging.info(json.dumps({"event_type": "analysis_completed", "sequencing_run_id": analysis_run_id, "pipeline_command": " ".join(pipeline_command)}))
+            os.rmdir(analysis_work_dir)
+            logging.info(json.dumps({"event_type": "analysis_work_dir_deleted", "sequencing_run_id": analysis_run_id, "analysis_work_dir_path": analysis_work_dir}))
+        except subprocess.CalledProcessError as e:
+            logging.error(json.dumps({"event_type": "analysis_failed", "sequencing_run_id": analysis_run_id, "pipeline_command": " ".join(pipeline_command)}))
+        except OSError as e:
+            logging.error(json.dumps({"event_type": "delete_analysis_work_dir_failed", "sequencing_run_id": analysis_run_id, "analysis_work_dir_path": analysis_work_dir}))
+        
+        

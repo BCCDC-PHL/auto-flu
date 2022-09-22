@@ -26,7 +26,10 @@ This tool takes a single config file, in JSON format, with the following structu
   "fastq_by_run_dir": "/path/to/fastq_symlinks_by_run",
   "analysis_output_dir": "/path/to/analysis_by_run",
   "analysis_work_dir": "/path/to/auto-flu-work",
-  "notification_email": "someone@example.org",
+  "notification_email_addresses": [
+	"someone@example.org",
+	"someone_else@example.org
+  ],
   "send_notification_emails": true,
   "scan_interval_seconds": 3600,
   "pipelines": [
@@ -41,4 +44,22 @@ This tool takes a single config file, in JSON format, with the following structu
 	}
   ]
 }
+```
+
+# Logging
+This tool outputs [structured logs](https://www.honeycomb.io/blog/structured-logging-and-your-team/) in [JSON Lines](https://jsonlines.org/) format:
+
+Every log line should include the fields:
+
+- `timestamp`
+- `level`
+- `module`
+- `function_name`
+- `line_num`
+- `message`
+
+...and the contents of the `message` key will be a JSON object that includes at `event_type`. The remaining keys inside the `message` will vary by event type.
+
+```json
+{"timestamp": "2022-09-22T11:32:52.287", "level": "INFO", "module", "core", "function_name": "scan", "line_num", 56, "message": {"event_type": "scan_start"}}
 ```
