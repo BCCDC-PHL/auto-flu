@@ -48,12 +48,12 @@ def main():
 
             scan_start_timestamp = datetime.datetime.now()
             for run in core.scan(config):
-                try:
-                    config = auto_flu.config.load_config(args.config)
-                    logging.info(json.dumps({"event_type": "config_loaded", "config_file": os.path.abspath(args.config)}))
-                except json.decoder.JSONDecodeError as e:
-                    logging.error(json.dumps({"event_type": "load_config_failed", "config_file": os.path.abspath(args.config)}))
                 if run is not None:
+                    try:
+                        config = auto_flu.config.load_config(args.config)
+                        logging.info(json.dumps({"event_type": "config_loaded", "config_file": os.path.abspath(args.config)}))
+                    except json.decoder.JSONDecodeError as e:
+                        logging.error(json.dumps({"event_type": "load_config_failed", "config_file": os.path.abspath(args.config)}))
                     core.analyze_run(config, run)
                 if quit_when_safe:
                     exit(0)
