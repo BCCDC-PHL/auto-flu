@@ -41,7 +41,7 @@ This tool takes a single config file, in JSON format, with the following structu
    	    "db": "/path/to/FluViewer_db.fa",
    	    "outdir": null
       }
-	}
+    }
   ]
 }
 ```
