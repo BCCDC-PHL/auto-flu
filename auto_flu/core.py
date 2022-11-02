@@ -18,14 +18,14 @@ def find_fastq_dirs(config, check_symlinks_complete=True):
     analysis_base_outdir = config['analysis_output_dir']
     for subdir in subdirs:
         run_id = subdir.name
-        analysis_outdir = os.path.abspath(os.path.join(analysis_base_outdir, run_id))
+        analysis_outdir = os.path.abspath(os.path.join(analysis_base_outdir))
         matches_miseq_regex = re.match(miseq_run_id_regex, run_id)
         matches_nextseq_regex = re.match(nextseq_run_id_regex, run_id)
         if check_symlinks_complete:
             ready_to_analyze = os.path.exists(os.path.join(subdir.path, "symlinks_complete.json"))
         else:
             ready_to_analyze = True
-        analysis_not_already_initiated = not os.path.exists(analysis_outdir)
+        analysis_not_already_initiated = not os.path.exists(os.path.join(analysis_outdir, run_id))
         conditions_checked = {
             "is_directory": subdir.is_dir(),
             "matches_illumina_run_id_format": ((matches_miseq_regex is not None) or (matches_nextseq_regex is not None)),
