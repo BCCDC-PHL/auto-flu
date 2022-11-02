@@ -72,12 +72,12 @@ def analyze_run(config, run):
         notification_email_addresses = []
     for pipeline in config['pipelines']:
         pipeline_parameters = pipeline['pipeline_parameters']
+        pipeline_short_name = pipeline['pipeline_name'].split('/')[1].replace('_', '-')
+        pipeline_minor_version = '.'.join(pipeline['pipeline_version'].split('.')[0:2])
         analysis_timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
         analysis_run_id = os.path.basename(run['fastq_input'])
         analysis_work_dir = os.path.abspath(os.path.join(base_analysis_work_dir, 'work-' + analysis_run_id + '-' + analysis_timestamp))
-        analysis_report_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id, analysis_run_id + '_report.html'))
-        analysis_trace_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id, analysis_run_id + '_trace.txt'))
-        analysis_timeline_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id, analysis_run_id + '_timeline.html'))
+        # analysis_trace_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id, pipeline_short_name + '-' + pipeline_minor_version + '-output', analysis_run_id + '_trace.tsv'))
         pipeline_command = [
             'nextflow',
             'run',
@@ -86,9 +86,7 @@ def analyze_run(config, run):
             '-profile', 'conda',
             '--cache', os.path.join(os.path.expanduser('~'), '.conda/envs'),
             '-work-dir', analysis_work_dir,
-            '-with-report', analysis_report_path,
-            '-with-trace', analysis_trace_path,
-            '-with-timeline', analysis_timeline_path,
+            # '-with-trace', analysis_trace_path,
         ]
         if 'send_notification_emails' in config and config['send_notification_emails']:
             pipeline_command += ['-with-notification', ','.join(notification_email_addresses)]
