@@ -26,11 +26,13 @@ def find_fastq_dirs(config, check_symlinks_complete=True):
         else:
             ready_to_analyze = True
         analysis_not_already_initiated = not os.path.exists(os.path.join(analysis_outdir, run_id))
+        not_excluded = run_id not in config['excluded_runs']
         conditions_checked = {
             "is_directory": subdir.is_dir(),
             "matches_illumina_run_id_format": ((matches_miseq_regex is not None) or (matches_nextseq_regex is not None)),
             "ready_to_analyze": ready_to_analyze,
             "analysis_not_already_initiated": analysis_not_already_initiated,
+            "not_excluded": not_excluded,
         }
         conditions_met = list(conditions_checked.values())
         pipeline_parameters = {}

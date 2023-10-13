@@ -26,6 +26,7 @@ This tool takes a single config file, in JSON format, with the following structu
   "fastq_by_run_dir": "/path/to/fastq_symlinks_by_run",
   "analysis_output_dir": "/path/to/analysis_by_run",
   "analysis_work_dir": "/path/to/auto-flu-work",
+  "excluded_runs_list": "/path/to/excluded_runs.csv",
   "notification_email_addresses": [
 	"someone@example.org",
 	"someone_else@example.org"
@@ -35,7 +36,7 @@ This tool takes a single config file, in JSON format, with the following structu
   "pipelines": [
     {
       "pipeline_name": "BCCDC-PHL/FluViewer_nf",
-      "pipeline_version": "0.0.9",
+      "pipeline_version": "0.1.1",
       "pipeline_parameters": {
   	    "fastq_input": null,
    	    "db": "/path/to/FluViewer_db.fa",
