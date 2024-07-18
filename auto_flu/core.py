@@ -141,13 +141,11 @@ def analyze_run(config: dict[str, object], run: dict[str, object], analysis_type
         try:
             logging.debug(json.dumps({"event_type": "prepare_analysis_started", "sequencing_run_id": sequencing_run_id, "pipeline_name": pipeline['pipeline_name']}))
             pipeline, analysis_dependencies_complete = pre_analysis.prepare_analysis(config, pipeline, run)
-            print(pipeline)
-            print(analysis_dependencies_complete)
+
         except Exception as e:
             logging.error(json.dumps({"event_type": "prepare_analysis_failed", "sequencing_run_id": sequencing_run_id, "pipeline_name": pipeline['pipeline_name'], "error": str(e)}))
             return
 
-        print(json.dumps(pipeline, indent=4))
         logging.debug(json.dumps({"event_type": "prepare_analysis_complete", "sequencing_run_id": sequencing_run_id, "pipeline_name": pipeline.get('pipeline_name', "unknown")}))
 
         analysis_not_already_started = not os.path.exists(pipeline['pipeline_parameters']['outdir'])

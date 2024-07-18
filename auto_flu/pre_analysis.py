@@ -129,7 +129,7 @@ def prepare_analysis(config, pipeline, run):
     if not analysis_dependencies_complete:
         logging.info(json.dumps({"event_type": "analysis_dependencies_incomplete", "pipeline_name": pipeline_name, "sequencing_run_id": sequencing_run_id}))
         return None, analysis_dependencies_complete
-    print(pipeline_name)
+
     if pipeline_name in pipeline_pre_analysis_functions :
         return pipeline_pre_analysis_functions[pipeline_name](config, pipeline, run), analysis_dependencies_complete
     else:

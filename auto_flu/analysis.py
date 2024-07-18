@@ -74,7 +74,6 @@ def run_pipeline(config, pipeline, run):
             "sequencing_run_id": sequencing_run_id,
             "pipeline_command": pipeline_command_str
         }))
-        print(pipeline_command_str)
         analysis_result = subprocess.run(pipeline_command_str, capture_output=True, check=True)
         analysis_tracking["timestamp_analysis_complete"] = datetime.datetime.now().isoformat()
         analysis_complete_path = os.path.join(pipeline['pipeline_parameters']['outdir'], 'analysis_complete.json')
