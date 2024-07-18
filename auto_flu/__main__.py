@@ -26,7 +26,7 @@ def main():
         log_level = logging.INFO
 
     logging.basicConfig(
-        format='{"timestamp": "%(asctime)s.%(msecs)03d", "level": "%(levelname)s", "module", "%(module)s", "function_name": "%(funcName)s", "line_num", %(lineno)d, "message": %(message)s}',
+        format='{"timestamp": "%(asctime)s.%(msecs)03d", "level": "%(levelname)s", "module": "%(module)s", "function_name": "%(funcName)s", "line_num": %(lineno)d, "message": %(message)s}',
         datefmt='%Y-%m-%dT%H:%M:%S',
         encoding='utf-8',
         level=log_level,
