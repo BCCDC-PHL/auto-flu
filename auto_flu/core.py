@@ -1,4 +1,6 @@
+import csv
 import datetime
+import glob
 import json
 import logging
 import os
@@ -9,40 +11,62 @@ import uuid
 
 from typing import Iterator, Optional
 
+import auto_flu.pre_analysis as pre_analysis
+import auto_flu.analysis as analysis
+import auto_flu.post_analysis as post_analysis
+
 
 def find_fastq_dirs(config, check_symlinks_complete=True):
-    miseq_run_id_regex = "\d{6}_M\d{5}_\d+_\d{9}-[A-Z0-9]{5}"
-    nextseq_run_id_regex = "\d{6}_VH\d{5}_\d+_[A-Z0-9]{9}"
+    """
+    Find all directories in the fastq_by_run_dir that match the expected format for a sequencing run directory.
+
+    :param config: Application config.
+    :type config: dict[str, object]
+    :param check_symlinks_complete: Whether or not to check for the presence of a `symlinks_complete.json` file in each run directory.
+    :type check_symlinks_complete: bool
+    :return: A run directory to analyze, or None
+    :rtype: Iterator[Optional[dict[str, object]]]
+    """
+    miseq_run_id_regex = "\\d{6}_M\\d{5}_\\d+_\\d{9}-[A-Z0-9]{5}"
+    nextseq_run_id_regex = "\\d{6}_VH\\d{5}_\\d+_[A-Z0-9]{9}"
+    gridion_run_id_regex = "\\d{8}_\\d{4}_X[1-5]_[A-Z0-9]+_[a-z0-9]{8}"
     fastq_by_run_dir = config['fastq_by_run_dir']
     subdirs = os.scandir(fastq_by_run_dir)
-    analysis_base_outdir = config['analysis_output_dir']
+    if 'analyze_runs_in_reverse_order' in config and config['analyze_runs_in_reverse_order']:
+        subdirs = sorted(subdirs, key=lambda x: os.path.basename(x.path), reverse=True)
     for subdir in subdirs:
         run_id = subdir.name
-        analysis_outdir = os.path.abspath(os.path.join(analysis_base_outdir))
+        run_fastq_directory = os.path.abspath(subdir.path)
+
         matches_miseq_regex = re.match(miseq_run_id_regex, run_id)
         matches_nextseq_regex = re.match(nextseq_run_id_regex, run_id)
+        matches_gridion_regex = re.match(gridion_run_id_regex, run_id)
+
         if check_symlinks_complete:
             ready_to_analyze = os.path.exists(os.path.join(subdir.path, "symlinks_complete.json"))
         else:
             ready_to_analyze = True
-        analysis_not_already_initiated = not os.path.exists(os.path.join(analysis_outdir, run_id))
-        not_excluded = run_id not in config['excluded_runs']
         conditions_checked = {
             "is_directory": subdir.is_dir(),
             "matches_illumina_run_id_format": ((matches_miseq_regex is not None) or (matches_nextseq_regex is not None)),
             "ready_to_analyze": ready_to_analyze,
-            "analysis_not_already_initiated": analysis_not_already_initiated,
-            "not_excluded": not_excluded,
         }
         conditions_met = list(conditions_checked.values())
-        pipeline_parameters = {}
+        
+        analysis_parameters = {}
         if all(conditions_met):
+
             logging.info(json.dumps({"event_type": "fastq_directory_found", "sequencing_run_id": run_id, "fastq_directory_path": os.path.abspath(subdir.path)}))
-            pipeline_parameters['fastq_input'] = os.path.abspath(subdir.path)
-            pipeline_parameters['outdir'] = analysis_outdir
-            yield pipeline_parameters
+            analysis_parameters['fastq_input'] = run_fastq_directory
+            run = {
+                "sequencing_run_id": run_id,
+                "fastq_directory": run_fastq_directory,
+                "instrument_type": "illumina",
+                "analysis_parameters": analysis_parameters
+            }
+            yield run
         else:
-            logging.debug(json.dumps({"event_type": "directory_skipped", "fastq_directory_path": os.path.abspath(subdir.path), "conditions_checked": conditions_checked}))
+            logging.debug(json.dumps({"event_type": "directory_skipped", "fastq_directory": run_fastq_directory, "conditions_checked": conditions_checked}))
             yield None
     
 
@@ -62,49 +86,89 @@ def scan(config: dict[str, object]) -> Iterator[Optional[dict[str, object]]]:
         yield symlinks_dir
 
 
-def analyze_run(config, run):
+
+def get_library_fastq_paths(fastq_input_dir: str):
     """
-    Initiate an analysis on one directory of fastq files.
+    Get the paths to all of the fastq files in a directory.
+    param: fastq_input_dir: Path to a directory containing fastq files.
+    type: fastq_input_dir: str
+    return: Paths to R1 and R2 fastq files, indexed by library ID. Keys of the dict are library IDs, values are dicts with keys: ['ID', 'R1', 'R2'].
+    rtype: dict[str, dict[str, str]]
     """
-    base_analysis_outdir = config['analysis_output_dir']
-    base_analysis_work_dir = config['analysis_work_dir']
-    if 'notification_email_addresses' in config:
-        notification_email_addresses = config['notification_email_addresses']
-    else:
-        notification_email_addresses = []
+    fastq_paths_by_library_id = {}
+    for fastq_file in glob.glob(os.path.join(fastq_input_dir, '*.f*q.gz')):
+        fastq_file_basename = os.path.basename(fastq_file)
+        fastq_file_abspath = os.path.abspath(fastq_file)
+        fastq_file_basename_parts = fastq_file_basename.split('_')
+        library_id = fastq_file_basename_parts[0]
+        if library_id not in fastq_paths_by_library_id:
+            fastq_paths_by_library_id[library_id] = {
+                'ID': library_id,
+                'R1': None,
+                'R2': None,
+            }
+        if '_R1' in fastq_file_basename:
+            fastq_paths_by_library_id[library_id]['R1'] = fastq_file_abspath
+        elif '_R2' in fastq_file_basename:
+            fastq_paths_by_library_id[library_id]['R2'] = fastq_file_abspath
+
+    return fastq_paths_by_library_id
+
+
+def analyze_run(config: dict[str, object], run: dict[str, object], analysis_type: str = "short"):
+    """
+    Initiate an analysis on one directory of fastq files. We assume that the directory of fastq files is named using
+    a sequencing run ID.
+
+    Runs the pipeline as defined in the config, with parameters configured for the run to be analyzed. Skips any
+    analyses that have already been initiated (whether completed or not).
+
+    Some pipelines may specify that they depend on the outputs of another through their 'dependencies' config.
+    For those pipelines, we confirm that all of the upstream analyses that we depend on are complete, or
+    the analysis will be skipped.
+
+    :param config:
+    :type config: dict[str, object]
+    :param run: Dictionary describing the run to be analyzed. Keys: ['sequencing_run_id', 'fastq_directory', 'instrument_type', 'analysis_parameters']
+    :type run: dict[str, object] Keys: ['sequencing_run_id', 'fastq_directory', 'instrument_type', 'analysis_parameters']
+    :param analysis_type: The type of analysis to perform. Default is 'short', alternative is 'hybrid'.
+    :type analysis_type: str
+    :return: None
+    :rtype: NoneType
+    """
+    sequencing_run_id = run['sequencing_run_id']
     for pipeline in config['pipelines']:
-        pipeline_parameters = pipeline['pipeline_parameters']
-        pipeline_short_name = pipeline['pipeline_name'].split('/')[1].replace('_', '-')
-        pipeline_minor_version = '.'.join(pipeline['pipeline_version'].split('.')[0:2])
-        analysis_timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
-        analysis_run_id = os.path.basename(run['fastq_input'])
-        analysis_work_dir = os.path.abspath(os.path.join(base_analysis_work_dir, 'work-' + analysis_run_id + '-' + analysis_timestamp))
-        # analysis_trace_path = os.path.abspath(os.path.join(base_analysis_outdir, analysis_run_id, pipeline_short_name + '-' + pipeline_minor_version + '-output', analysis_run_id + '_trace.tsv'))
-        pipeline_command = [
-            'nextflow',
-            'run',
-            pipeline['pipeline_name'],
-            '-r', pipeline['pipeline_version'],
-            '-profile', 'conda',
-            '--cache', os.path.join(os.path.expanduser('~'), '.conda/envs'),
-            '-work-dir', analysis_work_dir,
-            # '-with-trace', analysis_trace_path,
-        ]
-        if 'send_notification_emails' in config and config['send_notification_emails']:
-            pipeline_command += ['-with-notification', ','.join(notification_email_addresses)]
-        for flag, config_value in pipeline_parameters.items():
-            if config_value is None:
-                value = run[flag]
-            else:
-                value = config_value
-            pipeline_command += ['--' + flag, value]
-        logging.info(json.dumps({"event_type": "analysis_started", "sequencing_run_id": analysis_run_id, "pipeline_command": " ".join(pipeline_command)}))
         try:
-            subprocess.run(pipeline_command, capture_output=True, check=True)
-            logging.info(json.dumps({"event_type": "analysis_completed", "sequencing_run_id": analysis_run_id, "pipeline_command": " ".join(pipeline_command)}))
-            shutil.rmtree(analysis_work_dir, ignore_errors=True)
-            logging.info(json.dumps({"event_type": "analysis_work_dir_deleted", "sequencing_run_id": analysis_run_id, "analysis_work_dir_path": analysis_work_dir}))
-        except subprocess.CalledProcessError as e:
-            logging.error(json.dumps({"event_type": "analysis_failed", "sequencing_run_id": analysis_run_id, "pipeline_command": " ".join(pipeline_command)}))
-        except OSError as e:
-            logging.error(json.dumps({"event_type": "delete_analysis_work_dir_failed", "sequencing_run_id": analysis_run_id, "analysis_work_dir_path": analysis_work_dir}))
+            logging.debug(json.dumps({"event_type": "prepare_analysis_started", "sequencing_run_id": sequencing_run_id, "pipeline_name": pipeline['pipeline_name']}))
+            pipeline, analysis_dependencies_complete = pre_analysis.prepare_analysis(config, pipeline, run)
+
+        except Exception as e:
+            logging.error(json.dumps({"event_type": "prepare_analysis_failed", "sequencing_run_id": sequencing_run_id, "pipeline_name": pipeline['pipeline_name'], "error": str(e)}))
+            return
+
+        logging.debug(json.dumps({"event_type": "prepare_analysis_complete", "sequencing_run_id": sequencing_run_id, "pipeline_name": pipeline.get('pipeline_name', "unknown")}))
+
+        analysis_not_already_started = not os.path.exists(pipeline['pipeline_parameters']['outdir'])
+        conditions_checked = {
+            'pipeline_dependencies_met': analysis_dependencies_complete,
+            'analysis_not_already_started': analysis_not_already_started,
+        }
+        conditions_met = list(conditions_checked.values())
+
+        if not all(conditions_met):
+            logging.warning(json.dumps({
+                "event_type": "analysis_skipped",
+                "pipeline_name": pipeline['pipeline_name'],
+                "pipeline_version": pipeline['pipeline_version'],
+                "pipeline_dependencies": pipeline['dependencies'],
+                "sequencing_run_id": sequencing_run_id,
+                "conditions_checked": conditions_checked,
+            }))
+            continue
+
+        if pipeline:
+            analysis.run_pipeline(config, pipeline, run)
+            post_analysis.post_analysis(config, pipeline, run)
+        else:
+            logging.error(json.dumps({"event_type": "analysis_skipped", "sequencing_run_id": sequencing_run_id, "reason": "analysis_preparation_failed"}))
+            continue
