@@ -1,5 +1,5 @@
 # auto-flu
-Automated analysis of flu sequence data using the [BCCDC-PHL/FluViewer_nf](https://github.com/BCCDC-PHL/FluViewer_nf) pipeline.
+Automated analysis of flu sequence data using the [BCCDC-PHL/FluViewer_nf](https://github.com/BCCDC-PHL/fluviewer-nf) pipeline.
 
 # Installation
 
@@ -35,8 +35,8 @@ This tool takes a single config file, in JSON format, with the following structu
   "scan_interval_seconds": 3600,
   "pipelines": [
     {
-      "pipeline_name": "BCCDC-PHL/FluViewer_nf",
-      "pipeline_version": "0.1.1",
+      "pipeline_name": "BCCDC-PHL/fluviewer-nf",
+      "pipeline_version": "v0.3.0",
       "pipeline_parameters": {
   	    "fastq_input": null,
    	    "db": "/path/to/FluViewer_db.fa",
