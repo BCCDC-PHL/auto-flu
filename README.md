@@ -1,5 +1,5 @@
 # auto-flu
-Automated analysis of flu sequence data using the [BCCDC-PHL/FluViewer_nf](https://github.com/BCCDC-PHL/fluviewer-nf) pipeline.
+Automated analysis of flu sequence data using the [BCCDC-PHL/fluviewer-nf](https://github.com/BCCDC-PHL/fluviewer-nf) pipeline.
 
 # Installation
 
