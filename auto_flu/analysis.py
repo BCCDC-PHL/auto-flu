@@ -31,16 +31,22 @@ def build_pipeline_command(config, pipeline):
             '-with-trace', pipeline['pipeline_parameters']['trace_path'],
             '-with-timeline', pipeline['pipeline_parameters']['timeline_path'],
     ]
+    
+    # Remove any nextflow-specific params that have already
+    # been incorporated into the pipeline command
     pipeline['pipeline_parameters'].pop('log_path', None)
+    pipeline['pipeline_parameters'].pop('work_dir', None)
     pipeline['pipeline_parameters'].pop('report_path', None)
     pipeline['pipeline_parameters'].pop('trace_path', None)
     pipeline['pipeline_parameters'].pop('timeline_path', None)
 
+    # Iterate over any remaining params, incorporate into pipeline command
     for flag, value in pipeline['pipeline_parameters'].items():
         if value is None:
             pipeline_command += ['--' + flag]
         else:
             pipeline_command += ['--' + flag, value]
+
     
     return pipeline_command
 
@@ -62,11 +68,13 @@ def run_pipeline(config, pipeline, run):
     analysis_tracking = {
         "timestamp_analysis_start": datetime.datetime.now().isoformat()
     }
+
+    analysis_work_dir = pipeline['pipeline_parameters']['work_dir']
+
     pipeline_command = build_pipeline_command(config, pipeline)
     pipeline_command_str = list(map(str, pipeline_command))
 
-    sequencing_run_id = run['sequencing_run_id']
-    analysis_work_dir = pipeline['pipeline_parameters']['work_dir']
+    sequencing_run_id = run['sequencing_run_id']    
 
     try:
         os.makedirs(analysis_work_dir)
