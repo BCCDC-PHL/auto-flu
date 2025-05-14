@@ -3,7 +3,7 @@ from setuptools import setup, find_namespace_packages
 
 setup(
     name='auto-flu',
-    version='0.1.0-alpha',
+    version='0.1.1',
     packages=find_namespace_packages(),
     entry_points={
         "console_scripts": [
@@ -15,7 +15,7 @@ setup(
     },
     install_requires=[
     ],
-    description=' Automated analysis of flu sequence data',
+    description='Automated analysis of flu sequence data',
     url='https://github.com/BCCDC-PHL/auto-flu',
     author='Dan Fornika',
     author_email='dan.fornika@bccdc.ca',
